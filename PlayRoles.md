@@ -1,4 +1,4 @@
-a Very Simple project Which provide you 65 cards, Every card has Order "Rank" and Type "Suit".
+Very simple project where you given groups of cards , Every card has Order "Rank" and Type "Suit".
 the deal is to choose collection of cards , all Cards in collection must be:
   same Order (rank) but different Type (suits) 
                     OR
