@@ -5,9 +5,9 @@ the deal is to choose collection of cards , all Cards in collection must be:
   series of cards of the same Type (suit) 
                     and 
   dosen't include any repeated Cards
-the First 52 cards sorted from A0 to D12 [0-51] "to check first 2 roles".
-the last 13 cards have random Orders  "to Check Third Case".
 
-ِAnd there is "Down" Button to Tell You if Your Collection Meets the conditions.
+also there are Jokers Which are Pseudo Cards, can be any Rank or Type to help you make the collection Fit the Conditions
+
+if your collection Satisfied the you can Down it using Down Button
 
 Have Fun.
