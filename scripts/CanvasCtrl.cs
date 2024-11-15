@@ -1,7 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using TMPro;
+using Unity.Collections.LowLevel.Unsafe;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -79,93 +82,140 @@ public class CanvasCtrl : MonoBehaviour
     {
         List<CardCtrl> sortedCards = new();
         List<CardCtrl> Jokers = new();
-        Jokers.AddRange(cards.FindAll(c => c.Rank == -1));
+
+        Jokers.AddRange(cards.FindAll(c => c.name.Contains("Joker")));
         
-        cards.RemoveAll(c => c.Rank == -1);        
+        cards.RemoveAll(c => c.name.Contains("Joker"));        
 
         if (cards.All(c => c.Suit == cards[0].Suit))
         {
-            int jokerStep = 0;
-            for (int i = 0; i < cards.Count - 1; i+=1)
-            {
-                sortedCards.Add(cards[i]);
-                jokerStep = Mathf.Abs(cards[i].Rank - cards[i + 1].Rank);
-
-                bool isGapped = jokerStep != 1 && Jokers.Count > 0;
-                if (isGapped)
-                {
-                    for (int j = 0; j < jokerStep-1; j++)
-                    {
-                        if (Jokers.Count <= 0) break;
-                        CardCtrl joker = Jokers[0];
-                        joker.Rank = cards[i].Rank + 1 + j;
-                        if (joker.Rank >= 13) joker.Rank -= 13;
-
-                        sortedCards.Add(joker);
-                        Jokers.RemoveAt(0);
-                    }
-                }
-            }
-
-            sortedCards.Add(cards[^1]);
-            
-            if (Jokers.Count > 0)
-            {
-                foreach (CardCtrl J in Jokers)
-                {
-                    sortedCards.Add(J);
-                }
-            }
-
-            int lord = sortedCards.Max(c => c.Rank);
-            int serv = sortedCards.Min(c => c.Rank);
-
-            List<CardCtrl> meanCards = new();
+            int serv = cards.Min(c => c.Rank);
+            int lord = cards.Max(c => c.Rank);
 
             for (int i = serv; i <= lord; i++)
             {
-                if(sortedCards.Find(c => c.Rank == i))
-                    meanCards.Add(sortedCards.Find(c => c.Rank == i));
+                if (cards.Find(c => c.Rank == i)) 
+                    sortedCards.Add(cards.Find(c => c.Rank == i));
+            }
+
+            cards.Clear();
+            cards.AddRange(sortedCards);
+            sortedCards.Clear();
+
+            List<CardCtrl> subGroup = new();
+            int groupsCount = 1;
+
+            //separate Collection into Groups
+            CardCtrl[][] Groups = new CardCtrl[1][];
+
+            for (int i = 0; i < cards.Count; i++)
+            {
+                if (i > 0 && Mathf.Abs(cards[i].Rank - cards[i - 1].Rank) != 1)
+                {
+                    groupsCount++;
+                    subGroup.Clear();
+                    System.Array.Resize(ref Groups, groupsCount);
+                }
+
+                subGroup.Add(cards[i]);
+
+                System.Array.Resize(ref Groups[groupsCount - 1], subGroup.Count);
+                Groups[groupsCount - 1] = subGroup.ToArray();
+            }
+
+            //Rearrange new Groups into serial Group start form Last Group:
+            List<CardCtrl> MeanCards = new();
+
+            bool isPeriodic = cards[0].Rank + 13 - cards[^1].Rank <= 4;
+
+            if (Groups.Length > 1 && isPeriodic)
+            {
+                List<CardCtrl> InetialGroup = Groups[0].ToList();
+
+                for (int i = 0; i < Groups.Length - 1; i++)
+                {
+                    bool IsGapped = Mathf.Abs(InetialGroup[^1].Rank - Groups[i][0].Rank)
+                                  < Mathf.Abs(Groups[^1][0].Rank - Groups[i][^1].Rank);
+
+                    if (IsGapped)
+                    {
+                        foreach (CardCtrl card in Groups[i])
+                        {
+                            card.Rank += 13;
+                        }
+                    }
+                    MeanCards.AddRange(Groups[i]);
+                }
+                MeanCards.AddRange(Groups[^1]);
+            }
+            else
+            {
+                for (int i = 0; i < Groups.Length; i++)
+                {
+                    MeanCards.AddRange(Groups[i]);
+                }
             }
 
             sortedCards.Clear();
 
-            if (lord == 12 && serv == 0)
-            {
-                for (int i = meanCards.Count - 1; i > 0; i--)
-                {
-                    if (meanCards[i].Rank - meanCards[i - 1].Rank == 1)
-                    {
-                        sortedCards.Add(meanCards[i]);
-                        meanCards.Remove(meanCards[i]);
-                    }
-                    else { break; }
-                }
-                sortedCards.Add(meanCards[^1]);
-                sortedCards.Reverse();
-                sortedCards.AddRange(meanCards);
+            lord = MeanCards.Max(c => c.Rank);
+            serv = MeanCards.Min(c => c.Rank);
 
+            for (int i = serv; i <= lord; i++)
+            {
+                if (MeanCards.Find(c => c.Rank == i)) 
+                    sortedCards.Add(MeanCards.Find(c => c.Rank == i));
             }
-            else sortedCards.AddRange(meanCards);
             
-            for (int i = 0; i < sortedCards.Count; i++)
+            MeanCards.Clear();
+            MeanCards.AddRange(sortedCards);
+            sortedCards.Clear();
+
+            for (int i = 0; i < MeanCards.Count ; i++) 
             {
-                CardCtrl firstCard = sortedCards.Find(c => c.Rank > 0);
-                if (sortedCards[i].name.Contains("Joker"))
+                sortedCards.Add(MeanCards[i]);
+
+                if (i < MeanCards.Count - 1)
                 {
-                    int rank = sortedCards[(i == 0) ? ^1 : i - 1].Rank + 1;
-
-                    if (rank >= 13) rank -= 13;
-
-                    sortedCards[i].SuiteImage.color = firstCard.SuiteImage.color;
-
-                    foreach (TextMeshProUGUI rankText in sortedCards[i].RanksText)
+                    if (Mathf.Abs(MeanCards[i].Rank - MeanCards[i + 1].Rank) != 1)
                     {
-                        rankText.color = firstCard.SuiteImage.color;
-                        rankText.text = RankNames[rank];
+                        for (int j = 0; j < Mathf.Abs(MeanCards[i].Rank - MeanCards[i + 1].Rank) - 1; j++) 
+                        {
+                            CardCtrl joker = Jokers[0];
+
+                            joker.Rank = sortedCards[^1].Rank + 1;
+
+                            sortedCards.Add(joker);
+                            Jokers.Remove(joker);
+                        }
                     }
+
                 }
             }
+
+            for (int i = 0; i < Jokers.Count; i++)
+            {
+                CardCtrl joker = Jokers[i];
+
+                joker.Rank = sortedCards[^1].Rank + 1;
+
+                sortedCards.Add(joker);
+
+
+            }
+
+            sortedCards.FindAll(c => c.Rank >= 13).ForEach(c => c.Rank -= 13);
+            
+            CardCtrl prototypeCard = sortedCards.Find(c => c.name.Contains("Card "));
+            sortedCards.FindAll(c => c.name.Contains("Joker")).ForEach(c =>
+            {
+                c.SuiteImage.color = prototypeCard.SuiteImage.color;
+                foreach (TextMeshProUGUI rankText in c.RanksText)
+                {
+                    rankText.text = RankNames[c.Rank];
+                    rankText.color = prototypeCard.RanksText[0].color;
+                }
+            });
 
         }
         else 
@@ -205,4 +255,6 @@ public class CanvasCtrl : MonoBehaviour
             C.isDowned = true; 
         });
     }
+
+
 }
